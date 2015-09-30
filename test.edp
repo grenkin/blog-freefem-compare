@@ -1,0 +1,128 @@
+load "msh3"
+load "tetgen"
+load "medit"
+
+real ll = pi;
+real d = ll;
+real alpha = 1;
+real kappaa = 1;
+real uwall = 1;
+
+func g = 4*sin(x)*sin(y)*sin(z);
+
+func phib1 = -sin(x)*sin(y);
+func phib2 = -sin(x)*sin(z);
+func phib3 = -sin(y)*sin(z);
+
+int meshsize = 50;
+
+
+
+real x1,x2,y1,y2;
+
+/////////////////////////////////
+x1=0.; x2=1.*ll; y1=0.; y2=1.*d;
+mesh Thsq1 = square(meshsize,meshsize,[x1+(x2-x1)*x,y1+(y2-y1)*y]);
+func ZZ1min = 0;
+func ZZ1max = d;
+func XX1 = x;
+func YY1 = y;
+
+int[int] ref31h = [0,12];
+int[int] ref31b = [0,11];
+
+mesh3 Th31h = movemesh23(Thsq1,transfo=[XX1,YY1,ZZ1max],label=ref31h,orientation=1);
+mesh3 Th31b = movemesh23(Thsq1,transfo=[XX1,YY1,ZZ1min],label=ref31b,orientation=-1);
+
+
+
+
+/////////////////////////////////
+x1=0.; x2=1.*ll; y1=0.; y2=1.*d;
+mesh Thsq2 = square(meshsize,meshsize,[x1+(x2-x1)*x,y1+(y2-y1)*y]);
+func ZZ2 = y;
+func XX2 = x;
+func YY2min = 0.;
+func YY2max = d;
+
+int[int] ref32h = [0,13];
+int[int] ref32b = [0,14];
+
+mesh3 Th32h = movemesh23(Thsq2,transfo=[XX2,YY2max,ZZ2],label=ref32h,orientation=-1);  
+mesh3 Th32b = movemesh23(Thsq2,transfo=[XX2,YY2min,ZZ2],label=ref32b,orientation=1);
+
+
+
+
+
+/////////////////////////////////
+x1=0.; x2=1.*d; y1=0.; y2=1.*d;
+mesh Thsq3 = square(meshsize,meshsize,[x1+(x2-x1)*x,y1+(y2-y1)*y]);
+func XX3min = 0.;
+func XX3max = ll;
+func YY3 = x;
+func ZZ3 = y;
+
+int[int] ref33h = [0,15];
+int[int] ref33b = [0,16];
+
+mesh3 Th33h = movemesh23(Thsq3,transfo=[XX3max,YY3,ZZ3],label=ref33h,orientation=1);
+mesh3 Th33b = movemesh23(Thsq3,transfo=[XX3min,YY3,ZZ3],label=ref33b,orientation=-1);
+
+
+
+
+
+
+////////////////////////////////
+mesh3 Th33 = Th31h+Th31b+Th32h+Th32b+Th33h+Th33b;
+plot(Th33, wait=1);
+mesh3 Th = tetg(Th33,switch="pqaAAYYQ");
+medit("tetg",Th);
+
+
+
+
+
+macro Grad(w) [dx(w),dy(w),dz(w)] //
+fespace Vh(Th, P2);
+Vh phi, v;
+
+
+solve CalcPhi0(phi, v) =
+    int3d(Th)(alpha*Grad(phi)'*Grad(v))
+  + int3d(Th)(kappaa*phi*v)
+  - int3d(Th)(kappaa*g*v)
+  + int2d(Th, ref33b, ref33h)(uwall*phi*v)
+  + int2d(Th, ref31b, ref31h, ref32b, ref32h)(uwall*phi*v)
+  - int2d(Th, ref33b)(uwall*phib3*v)
+  - int2d(Th, ref33h)(uwall*phib3*v)
+  - int2d(Th, ref32b, ref32h)(uwall*phib2*v)
+  - int2d(Th, ref31b, ref31h)(uwall*phib1*v);
+
+
+Vh phiinit = phi;
+
+cout << "calc";
+
+int npts = meshsize+1;
+real xi, yj, zk;
+
+real maxdiff = 0;
+
+  for (int i = 1; i <= npts; i++)
+  {
+    xi = ll*(i-1)/(npts-1);
+    for (int j = 1; j <= npts; j++) {
+      yj = ll*(j-1)/(npts-1);
+      for (int k = 1; k <= npts; k++) {
+        zk = ll*(k-1)/(npts-1);
+        real sol = sin(xi)*sin(yj)*sin(zk);
+        real diff = abs(sol - phiinit(xi, yj, zk));
+        if (diff > maxdiff)
+          maxdiff = diff;
+      }
+    }
+  }
+
+cout << "\nmaxdiff = " << maxdiff << endl;
