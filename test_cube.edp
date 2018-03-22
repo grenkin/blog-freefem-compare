@@ -1,0 +1,60 @@
+load "msh3"
+load "tetgen"
+load "medit"
+
+real ll = pi;
+real d = ll;
+real alpha = 1;
+real kappaa = 1;
+real uwall = 1;
+
+func g = 4*sin(x)*sin(y)*sin(z);
+
+func phib1 = -sin(x)*sin(y);
+func phib2 = -sin(x)*sin(z);
+func phib3 = -sin(y)*sin(z);
+
+int meshsize = 50;
+
+mesh3 Th = cube(meshsize, meshsize, meshsize, [ll * x, ll * y, ll * z]);
+
+macro Grad(w) [dx(w),dy(w),dz(w)] //
+fespace Vh(Th, P1);
+Vh phi, v;
+
+
+solve CalcPhi0(phi, v) =
+    int3d(Th)(alpha*Grad(phi)'*Grad(v))
+  + int3d(Th)(kappaa*phi*v)
+  - int3d(Th)(kappaa*g*v)
+  + int2d(Th)(uwall*phi*v)
+  - int2d(Th, 2, 4)(uwall*phib3*v)
+  - int2d(Th, 1, 3)(uwall*phib2*v)
+  - int2d(Th, 5, 6)(uwall*phib1*v);
+
+
+Vh phiinit = phi;
+
+cout << "calc";
+
+int npts = meshsize+1;
+real xi, yj, zk;
+
+real maxdiff = 0;
+
+  for (int i = 1; i <= npts; i++)
+  {
+    xi = ll*(i-1)/(npts-1);
+    for (int j = 1; j <= npts; j++) {
+      yj = ll*(j-1)/(npts-1);
+      for (int k = 1; k <= npts; k++) {
+        zk = ll*(k-1)/(npts-1);
+        real sol = sin(xi)*sin(yj)*sin(zk);
+        real diff = abs(sol - phiinit(xi, yj, zk));
+        if (diff > maxdiff)
+          maxdiff = diff;
+      }
+    }
+  }
+
+cout << "\nmaxdiff = " << maxdiff << endl;
